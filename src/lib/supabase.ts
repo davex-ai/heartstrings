@@ -101,26 +101,45 @@ export async function updateAlbum(id: string, patch: { name?: string; descriptio
 }
 
 export async function deleteAlbum(id: string): Promise<void> {
-  // Use update without .single() — may affect 0 rows which is fine
   const { error: unlinkError } = await supabase
     .from('media')
     .update({ album_id: null })
     .eq('album_id', id);
+
   if (unlinkError) throw unlinkError;
 
-  const { error } = await supabase.from('albums').delete().eq('id', id);
+  const { data, error } = await supabase
+    .from('albums')
+    .delete()
+    .eq('id', id)
+    .select();
+
   if (error) throw error;
+
+  if (!data || data.length === 0) {
+    throw new Error('Album could not be deleted. Check RLS policies.');
+  }
 }
 
 export async function deleteManyAlbums(ids: string[]): Promise<void> {
   if (ids.length === 0) return;
-  // Unlink media for all albums
+
   const { error: unlinkError } = await supabase
     .from('media')
     .update({ album_id: null })
     .in('album_id', ids);
+
   if (unlinkError) throw unlinkError;
 
-  const { error } = await supabase.from('albums').delete().in('id', ids);
+  const { data, error } = await supabase
+    .from('albums')
+    .delete()
+    .in('id', ids)
+    .select();
+
   if (error) throw error;
+
+  if (!data || data.length === 0) {
+    throw new Error('Albums could not be deleted. Check RLS policies.');
+  }
 }
