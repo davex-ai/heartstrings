@@ -31,7 +31,7 @@ export default function Navbar({ viewMode, setViewMode, onUploadClick, onNewAlbu
       </div>
 
       <div className="navbar-search">
-        <Search size={14} className="search-icon-svg" />
+        <Search size={14} className="search-icon" />
         <input
           type="text"
           placeholder="Search memories…"
