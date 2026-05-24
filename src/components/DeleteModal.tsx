@@ -1,192 +1,234 @@
-import { useState } from 'react';
-import { X, Trash2, FolderOpen, Image, CheckCircle, AlertCircle } from 'lucide-react';
-import { deleteMedia, deleteAlbum } from '../lib/supabase';
+import { useState, useMemo } from 'react';
+import { X, Trash2, Image, Film, Music, FolderOpen, ChevronRight, ChevronLeft } from 'lucide-react';
+import { deleteManyMedia, deleteManyAlbums } from '../lib/supabase';
 import type { Album, MediaItem } from '../types';
 
-type DeleteTarget = 'choose' | 'albums' | 'media';
+type DeleteTarget = 'choose' | 'albums' | 'files';
 
 interface DeleteModalProps {
+  items: MediaItem[];
   albums: Album[];
-  media: MediaItem[];
   onClose: () => void;
-  onAlbumDeleted: (id: string) => void;
-  onMediaDeleted: (id: string) => void;
+  onItemsDeleted: (ids: string[]) => void;
+  onAlbumsDeleted: (ids: string[]) => void;
 }
 
-export default function DeleteModal({ albums, media, onClose, onAlbumDeleted, onMediaDeleted }: DeleteModalProps) {
+function MediaTypeIcon({ type }: { type: MediaItem['media_type'] }) {
+  if (type === 'video') return <Film size={14} strokeWidth={1.5} />;
+  if (type === 'audio') return <Music size={14} strokeWidth={1.5} />;
+  return <Image size={14} strokeWidth={1.5} />;
+}
+
+export default function DeleteModal({ items, albums, onClose, onItemsDeleted, onAlbumsDeleted }: DeleteModalProps) {
   const [step, setStep] = useState<DeleteTarget>('choose');
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [confirming, setConfirming] = useState(false);
-  const [progress, setProgress] = useState<Record<string, 'pending' | 'done' | 'error'>>({});
-  const [working, setWorking] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [deleting, setDeleting] = useState(false);
+  const [error, setError] = useState('');
+  const [mediaFilter, setMediaFilter] = useState<'all' | 'image' | 'video' | 'audio'>('all');
+
+  const filteredItems = useMemo(() => {
+    if (mediaFilter === 'all') return items;
+    return items.filter((i) => i.media_type === mediaFilter);
+  }, [items, mediaFilter]);
 
   function toggle(id: string) {
-    setSelected((prev) => {
+    setSelectedIds((prev) => {
       const next = new Set(prev);
       next.has(id) ? next.delete(id) : next.add(id);
       return next;
     });
   }
 
-  function toggleAll(ids: string[]) {
-    if (ids.every((id) => selected.has(id))) {
-      setSelected(new Set());
-    } else {
-      setSelected(new Set(ids));
+  function toggleAll(list: { id: string }[]) {
+    const allSelected = list.every((i) => selectedIds.has(i.id));
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (allSelected) list.forEach((i) => next.delete(i.id));
+      else list.forEach((i) => next.add(i.id));
+      return next;
+    });
+  }
+
+  async function confirmDelete() {
+    if (selectedIds.size === 0) return;
+    setDeleting(true);
+    setError('');
+    try {
+      const ids = Array.from(selectedIds);
+      if (step === 'files') {
+        await deleteManyMedia(ids, items);
+        onItemsDeleted(ids);
+      } else {
+        await deleteManyAlbums(ids);
+        onAlbumsDeleted(ids);
+      }
+      onClose();
+    } catch (e: any) {
+      setError(e.message);
+      setDeleting(false);
     }
   }
 
-  async function handleDelete() {
-    setWorking(true);
-    const ids = Array.from(selected);
+  const n = selectedIds.size;
 
-    if (step === 'albums') {
-      for (const id of ids) {
-        try {
-          await deleteAlbum(id);
-          setProgress((p) => ({ ...p, [id]: 'done' }));
-          onAlbumDeleted(id);
-        } catch {
-          setProgress((p) => ({ ...p, [id]: 'error' }));
-        }
-      }
-    } else {
-      const mediaMap = new Map(media.map((m) => [m.id, m]));
-      for (const id of ids) {
-        const item = mediaMap.get(id);
-        if (!item) continue;
-        try {
-          await deleteMedia(id, item.cloudinary_public_id, item.media_type);
-          setProgress((p) => ({ ...p, [id]: 'done' }));
-          onMediaDeleted(id);
-        } catch {
-          setProgress((p) => ({ ...p, [id]: 'error' }));
-        }
-      }
-    }
-
-    setWorking(false);
-    // Auto-close if everything succeeded
-    const allDone = ids.every((id) => progress[id] === 'done' || progress[id] === 'error');
-    if (allDone) setTimeout(onClose, 600);
+  // ── Step: choose ────────────────────────────────────────────────
+  if (step === 'choose') {
+    return (
+      <div className="modal-overlay" onClick={onClose}>
+        <div className="modal delete-modal" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-header">
+            <h2>Delete</h2>
+            <button className="modal-close" onClick={onClose}><X size={16} strokeWidth={1.5} /></button>
+          </div>
+          <div className="delete-choose">
+            <p className="delete-choose-label">What do you want to delete?</p>
+            <button className="delete-choice-btn" onClick={() => { setStep('files'); setSelectedIds(new Set()); }}>
+              <div className="delete-choice-icon"><Image size={22} strokeWidth={1.5} /></div>
+              <div className="delete-choice-text">
+                <span>Files</span>
+                <small>Photos, videos, or audio ({items.length} total)</small>
+              </div>
+              <ChevronRight size={18} strokeWidth={1.5} className="delete-choice-arrow" />
+            </button>
+            <button className="delete-choice-btn" onClick={() => { setStep('albums'); setSelectedIds(new Set()); }}>
+              <div className="delete-choice-icon"><FolderOpen size={22} strokeWidth={1.5} /></div>
+              <div className="delete-choice-text">
+                <span>Albums</span>
+                <small>Groups & collections ({albums.length} total)</small>
+              </div>
+              <ChevronRight size={18} strokeWidth={1.5} className="delete-choice-arrow" />
+            </button>
+          </div>
+        </div>
+      </div>
+    );
   }
 
-//   const isDone = Object.keys(progress).length > 0;
+  // ── Step: select files ──────────────────────────────────────────
+  if (step === 'files') {
+    const allSelected = filteredItems.length > 0 && filteredItems.every((i) => selectedIds.has(i.id));
+    return (
+      <div className="modal-overlay" onClick={onClose}>
+        <div className="modal delete-modal delete-modal-wide" onClick={(e) => e.stopPropagation()}>
+          <div className="modal-header">
+            <button className="back-btn-sm" onClick={() => { setStep('choose'); setSelectedIds(new Set()); }}>
+              <ChevronLeft size={15} strokeWidth={1.5} /> Back
+            </button>
+            <h2>Select Files to Delete</h2>
+            <button className="modal-close" onClick={onClose}><X size={16} strokeWidth={1.5} /></button>
+          </div>
 
+          {/* Filter tabs */}
+          <div className="delete-filter-tabs">
+            {(['all', 'image', 'video', 'audio'] as const).map((f) => (
+              <button key={f} className={`filter-tab ${mediaFilter === f ? 'active' : ''}`}
+                onClick={() => setMediaFilter(f)}>
+                {f === 'all' ? 'All' : f.charAt(0).toUpperCase() + f.slice(1) + 's'}
+              </button>
+            ))}
+            <label className="select-all-check">
+              <input type="checkbox" checked={allSelected}
+                onChange={() => toggleAll(filteredItems)} />
+              Select all
+            </label>
+          </div>
+
+          <div className="delete-file-list">
+            {filteredItems.length === 0 && (
+              <p className="delete-empty">No files of this type</p>
+            )}
+            {filteredItems.map((item) => (
+              <label key={item.id} className={`delete-file-row ${selectedIds.has(item.id) ? 'selected' : ''}`}>
+                <input type="checkbox" checked={selectedIds.has(item.id)} onChange={() => toggle(item.id)} />
+                <div className="delete-file-thumb">
+                  {item.media_type === 'image'
+                    ? <img src={item.thumbnail_url ?? item.cloudinary_url} alt={item.title} />
+                    : item.media_type === 'video'
+                      ? <div className="delete-thumb-icon"><Film size={20} strokeWidth={1.5} /></div>
+                      : <div className="delete-thumb-icon"><Music size={20} strokeWidth={1.5} /></div>}
+                </div>
+                <div className="delete-file-info">
+                  <span className="delete-file-title">{item.title}</span>
+                  <span className="delete-file-meta">
+                    <MediaTypeIcon type={item.media_type} />
+                    {new Date(item.taken_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                  </span>
+                </div>
+              </label>
+            ))}
+          </div>
+
+          {error && <p className="error-msg" style={{ margin: '0 24px' }}>{error}</p>}
+
+          <div className="modal-footer">
+            <button className="btn-secondary" onClick={onClose}>Cancel</button>
+            <button className="btn-danger" onClick={confirmDelete}
+              disabled={deleting || n === 0}>
+              <Trash2 size={15} strokeWidth={1.5} />
+              {deleting ? 'Deleting…' : `Delete ${n > 0 ? n : ''} file${n !== 1 ? 's' : ''}`}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Step: select albums ─────────────────────────────────────────
+  const allAlbumsSelected = albums.length > 0 && albums.every((a) => selectedIds.has(a.id));
   return (
     <div className="modal-overlay" onClick={onClose}>
       <div className="modal delete-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-header">
-          <h2>Delete</h2>
+          <button className="back-btn-sm" onClick={() => { setStep('choose'); setSelectedIds(new Set()); }}>
+            <ChevronLeft size={15} strokeWidth={1.5} /> Back
+          </button>
+          <h2>Select Albums to Delete</h2>
           <button className="modal-close" onClick={onClose}><X size={16} strokeWidth={1.5} /></button>
         </div>
 
-        {/* Step 1 — choose type */}
-        {step === 'choose' && (
-          <div className="delete-choose">
-            <p className="delete-hint">What do you want to delete?</p>
-            <div className="delete-options">
-              <button className="delete-option-btn" onClick={() => setStep('albums')}>
-                <FolderOpen size={28} strokeWidth={1} />
-                <span>Albums</span>
-                <small>{albums.length} album{albums.length !== 1 ? 's' : ''}</small>
-              </button>
-              <button className="delete-option-btn" onClick={() => setStep('media')}>
-                <Image size={28} strokeWidth={1} />
-                <span>Photos, Videos & Audio</span>
-                <small>{media.length} item{media.length !== 1 ? 's' : ''}</small>
-              </button>
-            </div>
-          </div>
-        )}
+        <div className="delete-filter-tabs">
+          <label className="select-all-check">
+            <input type="checkbox" checked={allAlbumsSelected}
+              onChange={() => toggleAll(albums)} />
+            Select all
+          </label>
+        </div>
 
-        {/* Step 2 — pick albums */}
-        {step === 'albums' && (
-          <div className="delete-list-wrap">
-            <div className="delete-list-header">
-              <button className="back-btn" onClick={() => { setStep('choose'); setSelected(new Set()); }}>← Back</button>
-              <span className="delete-hint">{selected.size} selected</span>
-              <button className="select-all-btn" onClick={() => toggleAll(albums.map((a) => a.id))}>
-                {albums.every((a) => selected.has(a.id)) ? 'Deselect all' : 'Select all'}
-              </button>
-            </div>
-            <div className="delete-list">
-              {albums.map((album) => {
-                const state = progress[album.id];
-                return (
-                  <label key={album.id} className={`delete-list-item ${selected.has(album.id) ? 'selected' : ''} ${state ? `state-${state}` : ''}`}>
-                    {state === 'done' ? <CheckCircle size={16} strokeWidth={1.5} className="state-icon done" /> :
-                     state === 'error' ? <AlertCircle size={16} strokeWidth={1.5} className="state-icon error" /> :
-                     <input type="checkbox" checked={selected.has(album.id)} onChange={() => toggle(album.id)} disabled={working} />}
-                    <div className="delete-item-info">
-                      <span>{album.name}</span>
-                      {album.description && <small>{album.description}</small>}
-                    </div>
-                  </label>
-                );
-              })}
-            </div>
-          </div>
-        )}
+        <div className="delete-file-list">
+          {albums.length === 0 && <p className="delete-empty">No albums yet</p>}
+          {albums.map((album) => {
+            const count = items.filter((i) => i.album_id === album.id).length;
+            const cover = items.find((i) => i.album_id === album.id && i.media_type === 'image');
+            return (
+              <label key={album.id} className={`delete-file-row ${selectedIds.has(album.id) ? 'selected' : ''}`}>
+                <input type="checkbox" checked={selectedIds.has(album.id)} onChange={() => toggle(album.id)} />
+                <div className="delete-file-thumb">
+                  {cover
+                    ? <img src={cover.thumbnail_url ?? cover.cloudinary_url} alt={album.name} />
+                    : <div className="delete-thumb-icon"><FolderOpen size={20} strokeWidth={1.5} /></div>}
+                </div>
+                <div className="delete-file-info">
+                  <span className="delete-file-title">{album.name}</span>
+                  <span className="delete-file-meta">
+                    <FolderOpen size={12} strokeWidth={1.5} />
+                    {count} item{count !== 1 ? 's' : ''} · media will be kept, just unlinked
+                  </span>
+                </div>
+              </label>
+            );
+          })}
+        </div>
 
-        {/* Step 2 — pick media */}
-        {step === 'media' && (
-          <div className="delete-list-wrap">
-            <div className="delete-list-header">
-              <button className="back-btn" onClick={() => { setStep('choose'); setSelected(new Set()); }}>← Back</button>
-              <span className="delete-hint">{selected.size} selected</span>
-              <button className="select-all-btn" onClick={() => toggleAll(media.map((m) => m.id))}>
-                {media.every((m) => selected.has(m.id)) ? 'Deselect all' : 'Select all'}
-              </button>
-            </div>
-            <div className="delete-list delete-media-list">
-              {media.map((item) => {
-                const state = progress[item.id];
-                const thumb = item.thumbnail_url ?? (item.media_type === 'image' ? item.cloudinary_url : '');
-                return (
-                  <label key={item.id} className={`delete-list-item delete-media-item ${selected.has(item.id) ? 'selected' : ''} ${state ? `state-${state}` : ''}`}>
-                    {state === 'done' ? <CheckCircle size={16} strokeWidth={1.5} className="state-icon done" /> :
-                     state === 'error' ? <AlertCircle size={16} strokeWidth={1.5} className="state-icon error" /> :
-                     <input type="checkbox" checked={selected.has(item.id)} onChange={() => toggle(item.id)} disabled={working} />}
-                    {thumb
-                      ? <img src={thumb} alt={item.title} className="delete-media-thumb" />
-                      : <div className="delete-media-thumb delete-media-thumb-icon">
-                          {item.media_type === 'video' ? '🎬' : '🎵'}
-                        </div>}
-                    <div className="delete-item-info">
-                      <span>{item.title}</span>
-                      <small>{new Date(item.taken_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}</small>
-                    </div>
-                  </label>
-                );
-              })}
-            </div>
-          </div>
-        )}
+        {error && <p className="error-msg" style={{ margin: '0 24px' }}>{error}</p>}
 
-        {/* Footer */}
-        {step !== 'choose' && (
-          <div className="modal-footer">
-            {!confirming ? (
-              <>
-                <button className="btn-secondary" onClick={onClose} disabled={working}>Cancel</button>
-                <button className="btn-danger-outline" onClick={() => setConfirming(true)}
-                  disabled={selected.size === 0 || working}>
-                  <Trash2 size={14} strokeWidth={1.5} />
-                  Delete {selected.size > 0 ? `${selected.size} item${selected.size !== 1 ? 's' : ''}` : '…'}
-                </button>
-              </>
-            ) : (
-              <div className="inline-confirm" style={{ width: '100%', justifyContent: 'flex-end' }}>
-                <span>This cannot be undone.</span>
-                <button className="btn-danger-sm" onClick={handleDelete} disabled={working}>
-                  {working ? 'Deleting…' : 'Confirm Delete'}
-                </button>
-                <button className="btn-ghost-sm" onClick={() => setConfirming(false)} disabled={working}>Cancel</button>
-              </div>
-            )}
-          </div>
-        )}
+        <div className="modal-footer">
+          <button className="btn-secondary" onClick={onClose}>Cancel</button>
+          <button className="btn-danger" onClick={confirmDelete}
+            disabled={deleting || n === 0}>
+            <Trash2 size={15} strokeWidth={1.5} />
+            {deleting ? 'Deleting…' : `Delete ${n > 0 ? n : ''} album${n !== 1 ? 's' : ''}`}
+          </button>
+        </div>
       </div>
     </div>
   );

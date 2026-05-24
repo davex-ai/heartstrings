@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import {
   Film, Search, LayoutGrid, AlignJustify, FolderOpen,
-  Upload, Sun, Moon, LogOut, User, FolderPlus, Trash2 
+  Upload, Sun, Moon, LogOut, User, FolderPlus, Trash2,
 } from 'lucide-react';
 import { signOut } from '../lib/supabase';
 import { useTheme } from '../context/ThemeContext';
@@ -13,11 +13,11 @@ interface NavbarProps {
   setViewMode: (v: ViewMode) => void;
   onUploadClick: () => void;
   onNewAlbum: () => void;
-  onSearch: (q: string) => void;
   onDeleteClick: () => void;
+  onSearch: (q: string) => void;
 }
 
-export default function Navbar({ viewMode, setViewMode, onUploadClick, onNewAlbum, onSearch, onDeleteClick }: NavbarProps) {
+export default function Navbar({ viewMode, setViewMode, onUploadClick, onNewAlbum, onDeleteClick, onSearch }: NavbarProps) {
   const { theme, toggleTheme } = useTheme();
   const { user } = useAuth();
   const [searchVal, setSearchVal] = useState('');
@@ -26,12 +26,12 @@ export default function Navbar({ viewMode, setViewMode, onUploadClick, onNewAlbu
   return (
     <nav className="navbar">
       <div className="navbar-brand">
-        <Film size={20} strokeWidth={1.5} />
+        <Film size={20} strokeWidth={1.5} className="brand-icon" />
         <span className="navbar-title">Heartstrings</span>
       </div>
 
       <div className="navbar-search">
-        <Search size={14} className="search-icon" />
+        <Search size={14} className="search-icon-svg" />
         <input
           type="text"
           placeholder="Search memories…"
@@ -55,19 +55,19 @@ export default function Navbar({ viewMode, setViewMode, onUploadClick, onNewAlbu
 
       <div className="navbar-actions">
         {viewMode === 'albums' && (
-          <button className="btn-new-album" onClick={onNewAlbum} title="New Album">
+          <button className="btn-new-album" onClick={onNewAlbum}>
             <FolderPlus size={15} strokeWidth={1.5} />
             <span>New Album</span>
           </button>
         )}
-        <button className="btn-delete-nav" onClick={onDeleteClick} title="Delete items">
-  <Trash2 size={15} strokeWidth={1.5} />
-</button>
         <button className="btn-upload" onClick={onUploadClick}>
           <Upload size={15} strokeWidth={1.5} />
           <span>Upload</span>
         </button>
-        <button className="theme-toggle" onClick={toggleTheme} title="Toggle theme">
+        <button className="btn-delete-nav" onClick={onDeleteClick} title="Delete items">
+          <Trash2 size={16} strokeWidth={1.5} />
+        </button>
+        <button className="btn-theme-toggle" onClick={toggleTheme} title={theme === 'dark' ? 'Light mode' : 'Dark mode'}>
           {theme === 'dark'
             ? <Sun size={18} strokeWidth={1.5} />
             : <Moon size={18} strokeWidth={1.5} />}
@@ -79,8 +79,9 @@ export default function Navbar({ viewMode, setViewMode, onUploadClick, onNewAlbu
           {menuOpen && (
             <div className="user-menu">
               <p className="user-email">{user?.email}</p>
-              <button onClick={() => { setMenuOpen(false); signOut(); }}>
-                <LogOut size={14} strokeWidth={1.5} /> Sign out
+              <button className="user-menu-item" onClick={() => { setMenuOpen(false); signOut(); }}>
+                <LogOut size={14} strokeWidth={1.5} />
+                <span>Sign out</span>
               </button>
             </div>
           )}

@@ -6,6 +6,7 @@ import Navbar from './Navbar';
 import Gallery from './Gallery';
 import UploadModal from './UploadModal';
 import AlbumModal from './AlbumModal';
+import DeleteModal from './DeleteModal';
 import type { Album, ViewMode } from '../types';
 
 export default function App() {
@@ -15,6 +16,7 @@ export default function App() {
 
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [albumModal, setAlbumModal] = useState<{ open: boolean; album?: Album }>({ open: false });
   const [searchQuery, setSearchQuery] = useState('');
 
@@ -28,6 +30,7 @@ export default function App() {
         setViewMode={setViewMode}
         onUploadClick={() => setUploadOpen(true)}
         onNewAlbum={() => setAlbumModal({ open: true })}
+        onDeleteClick={() => setDeleteOpen(true)}
         onSearch={setSearchQuery}
       />
       <main className="app-main">
@@ -57,10 +60,26 @@ export default function App() {
           onUpdated={(id, patch) => albumState.patchAlbum(id, patch)}
           onDeleted={(id) => {
             albumState.removeAlbum(id);
-            // Unlink any media that belonged to this album in local state
             mediaState.items
               .filter((m) => m.album_id === id)
               .forEach((m) => mediaState.patchItem(m.id, { album_id: undefined }));
+          }}
+        />
+      )}
+
+      {deleteOpen && (
+        <DeleteModal
+          items={mediaState.items}
+          albums={albumState.albums}
+          onClose={() => setDeleteOpen(false)}
+          onItemsDeleted={(ids) => ids.forEach((id) => mediaState.removeItem(id))}
+          onAlbumsDeleted={(ids) => {
+            ids.forEach((id) => {
+              albumState.removeAlbum(id);
+              mediaState.items
+                .filter((m) => m.album_id === id)
+                .forEach((m) => mediaState.patchItem(m.id, { album_id: undefined }));
+            });
           }}
         />
       )}

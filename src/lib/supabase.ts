@@ -43,30 +43,37 @@ export async function updateMedia(id: string, patch: Partial<Omit<MediaItem, 'id
   return data as MediaItem;
 }
 
-/**
- * Delete a media record from Supabase.
- * Also attempts to delete from Cloudinary via an Edge Function.
- * If the Edge Function isn't deployed yet, the DB record is still removed.
- */
 export async function deleteMedia(id: string, cloudinaryPublicId: string, resourceType: 'image' | 'video' | 'audio'): Promise<void> {
-  // 1. Remove from DB first so UI reflects instantly
   const { error } = await supabase.from('media').delete().eq('id', id);
   if (error) throw error;
-
-  // 2. Fire-and-forget Cloudinary delete via Edge Function
   try {
     await supabase.functions.invoke('delete-cloudinary-asset', {
       body: { public_id: cloudinaryPublicId, resource_type: resourceType === 'audio' ? 'video' : resourceType },
     });
   } catch {
-    // Edge function not deployed yet — that's fine, DB record is already gone
     console.warn('Cloudinary delete skipped (edge function not deployed)');
   }
 }
 
-/**
- * Called when an image URL 404s — removes the stale DB record silently.
- */
+export async function deleteManyMedia(ids: string[], items: MediaItem[]): Promise<void> {
+  if (ids.length === 0) return;
+  const { error } = await supabase.from('media').delete().in('id', ids);
+  if (error) throw error;
+  // Fire-and-forget Cloudinary deletes
+  for (const id of ids) {
+    const item = items.find((i) => i.id === id);
+    if (!item) continue;
+    try {
+      await supabase.functions.invoke('delete-cloudinary-asset', {
+        body: {
+          public_id: item.cloudinary_public_id,
+          resource_type: item.media_type === 'audio' ? 'video' : item.media_type,
+        },
+      });
+    } catch { /* silent */ }
+  }
+}
+
 export async function removeStaleMedia(id: string): Promise<void> {
   await supabase.from('media').delete().eq('id', id);
 }
@@ -94,10 +101,26 @@ export async function updateAlbum(id: string, patch: { name?: string; descriptio
 }
 
 export async function deleteAlbum(id: string): Promise<void> {
-  // Unlink media — ignore errors (RLS may block bulk update, media stays intact)
-  try {
-    await supabase.from('media').update({ album_id: null }).eq('album_id', id).select();
-  } catch (_) {}
+  // Use update without .single() — may affect 0 rows which is fine
+  const { error: unlinkError } = await supabase
+    .from('media')
+    .update({ album_id: null })
+    .eq('album_id', id);
+  if (unlinkError) throw unlinkError;
+
   const { error } = await supabase.from('albums').delete().eq('id', id);
+  if (error) throw error;
+}
+
+export async function deleteManyAlbums(ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  // Unlink media for all albums
+  const { error: unlinkError } = await supabase
+    .from('media')
+    .update({ album_id: null })
+    .in('album_id', ids);
+  if (unlinkError) throw unlinkError;
+
+  const { error } = await supabase.from('albums').delete().in('id', ids);
   if (error) throw error;
 }

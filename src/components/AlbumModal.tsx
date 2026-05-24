@@ -1,6 +1,6 @@
 import { useState, FormEvent } from 'react';
-import { X } from 'lucide-react';
-import { createAlbum, updateAlbum } from '../lib/supabase';
+import { X, Trash2 } from 'lucide-react';
+import { createAlbum, updateAlbum, deleteAlbum } from '../lib/supabase';
 import type { Album } from '../types';
 
 interface AlbumModalProps {
@@ -8,13 +8,16 @@ interface AlbumModalProps {
   onClose: () => void;
   onCreated: (album: Album) => void;
   onUpdated: (id: string, patch: Partial<Album>) => void;
+  onDeleted: (id: string) => void;
 }
 
-export default function AlbumModal({ album, onClose, onCreated, onUpdated }: AlbumModalProps) {
+export default function AlbumModal({ album, onClose, onCreated, onUpdated, onDeleted }: AlbumModalProps) {
   const isEdit = !!album;
   const [name, setName] = useState(album?.name ?? '');
   const [description, setDescription] = useState(album?.description ?? '');
   const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const [error, setError] = useState('');
 
   async function handleSubmit(e: FormEvent) {
@@ -39,19 +42,19 @@ export default function AlbumModal({ album, onClose, onCreated, onUpdated }: Alb
     }
   }
 
-  // async function handleDelete() {
-  //   if (!album) return;
-  //   setDeleting(true);
-  //   try {
-  //     await deleteAlbum(album.id);
-  //     onDeleted(album.id);
-  //     onClose();
-  //   } catch (err: any) {
-  //     setError(err.message);
-  //     setDeleting(false);
-  //     setConfirmDelete(false);
-  //   }
-  // }
+  async function handleDelete() {
+    if (!album) return;
+    setDeleting(true);
+    try {
+      await deleteAlbum(album.id);
+      onDeleted(album.id);
+      onClose();
+    } catch (err: any) {
+      setError(err.message);
+      setDeleting(false);
+      setConfirmDelete(false);
+    }
+  }
 
   return (
     <div className="modal-overlay" onClick={onClose}>
@@ -87,6 +90,23 @@ export default function AlbumModal({ album, onClose, onCreated, onUpdated }: Alb
           {error && <p className="error-msg">{error}</p>}
 
           <div className="modal-footer">
+            {isEdit && !confirmDelete && (
+              <button type="button" className="btn-danger-outline"
+                onClick={() => setConfirmDelete(true)}>
+                <Trash2 size={14} strokeWidth={1.5} /> Delete
+              </button>
+            )}
+            {isEdit && confirmDelete && (
+              <div className="inline-confirm">
+                <span>Delete album and unlink all its media?</span>
+                <button type="button" className="btn-danger-sm" onClick={handleDelete} disabled={deleting}>
+                  {deleting ? '…' : 'Delete'}
+                </button>
+                <button type="button" className="btn-ghost-sm" onClick={() => setConfirmDelete(false)}>
+                  Cancel
+                </button>
+              </div>
+            )}
             <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
               <button type="button" className="btn-secondary" onClick={onClose}>Cancel</button>
               <button type="submit" className="btn-primary" disabled={saving || !name.trim()}>
