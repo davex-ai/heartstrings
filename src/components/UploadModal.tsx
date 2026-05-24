@@ -1,5 +1,5 @@
 import { useState, useRef, DragEvent, ChangeEvent } from 'react';
-import { X, Upload, FolderOpen, CheckCircle, AlertCircle, Music, Film } from 'lucide-react';
+import { X, Upload, CheckCircle, AlertCircle, Music, Film } from 'lucide-react';
 import { uploadToCloudinary, getMediaType } from '../lib/cloudinary';
 import { insertMedia } from '../lib/supabase';
 import { useAuth } from '../context/AuthContext';
