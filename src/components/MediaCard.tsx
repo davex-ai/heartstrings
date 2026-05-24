@@ -1,13 +1,16 @@
 import { useState } from 'react';
+import { Play, Music, ImageOff } from 'lucide-react';
 import type { MediaItem } from '../types';
 import { formatDuration } from '../lib/cloudinary';
+import { removeStaleMedia } from '../lib/supabase';
 
 interface MediaCardProps {
   item: MediaItem;
   onClick: () => void;
+  onStaleRemoved?: (id: string) => void;
 }
 
-export default function MediaCard({ item, onClick }: MediaCardProps) {
+export default function MediaCard({ item, onClick, onStaleRemoved }: MediaCardProps) {
   const [imgError, setImgError] = useState(false);
   const [loaded, setLoaded] = useState(false);
 
@@ -15,13 +18,38 @@ export default function MediaCard({ item, onClick }: MediaCardProps) {
   const isAudio = item.media_type === 'audio';
   const isVideo = item.media_type === 'video';
 
+  async function handleImgError() {
+    setImgError(true);
+    // Auto-clean stale record from DB + notify parent to remove from UI
+    try {
+      await removeStaleMedia(item.id);
+      onStaleRemoved?.(item.id);
+    } catch {
+      // silent — DB cleanup is best-effort
+    }
+  }
+
+  if (imgError && !isAudio) {
+    // Render a ghost card briefly before parent removes it
+    return (
+      <div className="media-card media-card-ghost">
+        <div className="media-card-thumb">
+          <div className="thumb-error">
+            <ImageOff size={28} strokeWidth={1.5} />
+            <span>Removed</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="media-card" onClick={onClick} role="button" tabIndex={0}
       onKeyDown={(e) => e.key === 'Enter' && onClick()}>
       <div className="media-card-thumb">
         {isAudio ? (
           <div className="audio-thumb">
-            <span className="audio-icon">🎵</span>
+            <Music size={36} strokeWidth={1} />
           </div>
         ) : (
           <>
@@ -30,19 +58,14 @@ export default function MediaCard({ item, onClick }: MediaCardProps) {
               src={thumb}
               alt={item.title}
               onLoad={() => setLoaded(true)}
-              onError={() => setImgError(true)}
+              onError={handleImgError}
               style={{ opacity: loaded ? 1 : 0 }}
             />
-            {imgError && (
-              <div className="thumb-error">
-                <span>{isVideo ? '🎬' : '🖼️'}</span>
-              </div>
-            )}
           </>
         )}
         {isVideo && (
           <div className="play-badge">
-            ▶
+            <Play size={10} fill="white" strokeWidth={0} />
             {item.duration && <span>{formatDuration(item.duration)}</span>}
           </div>
         )}
