@@ -22,12 +22,19 @@ export function useMedia() {
 
   useEffect(() => { load(); }, [load]);
 
-  // Optimistically prepend a new item so it shows instantly
   const addItem = useCallback((item: MediaItem) => {
     setItems((prev) => [item, ...prev]);
   }, []);
 
-  return { items, loading, error, refetch: load, addItem };
+  const removeItem = useCallback((id: string) => {
+    setItems((prev) => prev.filter((i) => i.id !== id));
+  }, []);
+
+  const patchItem = useCallback((id: string, patch: Partial<MediaItem>) => {
+    setItems((prev) => prev.map((i) => (i.id === id ? { ...i, ...patch } : i)));
+  }, []);
+
+  return { items, loading, error, refetch: load, addItem, removeItem, patchItem };
 }
 
 export function useAlbums() {
@@ -50,30 +57,31 @@ export function useAlbums() {
     setAlbums((prev) => [album, ...prev]);
   }, []);
 
-  return { albums, loading, refetch: load, addAlbum };
+  const removeAlbum = useCallback((id: string) => {
+    setAlbums((prev) => prev.filter((a) => a.id !== id));
+  }, []);
+
+  const patchAlbum = useCallback((id: string, patch: Partial<Album>) => {
+    setAlbums((prev) => prev.map((a) => (a.id === id ? { ...a, ...patch } : a)));
+  }, []);
+
+  return { albums, loading, refetch: load, addAlbum, removeAlbum, patchAlbum };
 }
 
 export function groupByDate(items: MediaItem[]): DateGroup[] {
   const map = new Map<string, DateGroup>();
-
   items.forEach((item) => {
     const d = new Date(item.taken_at);
     const year = d.getFullYear();
     const month = d.getMonth();
     const key = `${year}-${month}`;
-
     if (!map.has(key)) {
       map.set(key, {
         label: d.toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
-        year,
-        month,
-        items: [],
+        year, month, items: [],
       });
     }
     map.get(key)!.items.push(item);
   });
-
-  return Array.from(map.values()).sort(
-    (a, b) => b.year - a.year || b.month - a.month
-  );
+  return Array.from(map.values()).sort((a, b) => b.year - a.year || b.month - a.month);
 }
