@@ -5,8 +5,8 @@ import LoginPage from './LoginPage';
 import Navbar from './Navbar';
 import Gallery from './Gallery';
 import UploadModal from './UploadModal';
-import CreateAlbumModal from './CreateAlbumModal';
-import type { ViewMode } from '../types';
+import AlbumModal from './AlbumModal';
+import type { Album, ViewMode } from '../types';
 
 export default function App() {
   const { session, loading } = useAuth();
@@ -15,17 +15,10 @@ export default function App() {
 
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [uploadOpen, setUploadOpen] = useState(false);
-  const [albumModalOpen, setAlbumModalOpen] = useState(false);
+  const [albumModal, setAlbumModal] = useState<{ open: boolean; album?: Album }>({ open: false });
   const [searchQuery, setSearchQuery] = useState('');
 
-  if (loading) {
-    return (
-      <div className="app-loading">
-        <div className="spinner" />
-      </div>
-    );
-  }
-
+  if (loading) return <div className="app-loading"><div className="spinner" /></div>;
   if (!session) return <LoginPage />;
 
   return (
@@ -34,7 +27,7 @@ export default function App() {
         viewMode={viewMode}
         setViewMode={setViewMode}
         onUploadClick={() => setUploadOpen(true)}
-        onNewAlbum={() => setAlbumModalOpen(true)}
+        onNewAlbum={() => setAlbumModal({ open: true })}
         onSearch={setSearchQuery}
       />
       <main className="app-main">
@@ -43,7 +36,8 @@ export default function App() {
           searchQuery={searchQuery}
           mediaState={mediaState}
           albumState={albumState}
-          onNewAlbum={() => setAlbumModalOpen(true)}
+          onNewAlbum={() => setAlbumModal({ open: true })}
+          onEditAlbum={(album) => setAlbumModal({ open: true, album })}
         />
       </main>
 
@@ -55,10 +49,19 @@ export default function App() {
         />
       )}
 
-      {albumModalOpen && (
-        <CreateAlbumModal
-          onClose={() => setAlbumModalOpen(false)}
+      {albumModal.open && (
+        <AlbumModal
+          album={albumModal.album}
+          onClose={() => setAlbumModal({ open: false })}
           onCreated={albumState.addAlbum}
+          onUpdated={(id, patch) => albumState.patchAlbum(id, patch)}
+          onDeleted={(id) => {
+            albumState.removeAlbum(id);
+            // Unlink any media that belonged to this album in local state
+            mediaState.items
+              .filter((m) => m.album_id === id)
+              .forEach((m) => mediaState.patchItem(m.id, { album_id: undefined }));
+          }}
         />
       )}
     </div>

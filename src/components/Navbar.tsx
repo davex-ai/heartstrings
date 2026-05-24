@@ -1,4 +1,8 @@
 import { useState } from 'react';
+import {
+  Film, Search, LayoutGrid, AlignJustify, FolderOpen,
+  Upload, Sun, Moon, LogOut, User, FolderPlus, Trash2 
+} from 'lucide-react';
 import { signOut } from '../lib/supabase';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
@@ -10,49 +14,41 @@ interface NavbarProps {
   onUploadClick: () => void;
   onNewAlbum: () => void;
   onSearch: (q: string) => void;
+  onDeleteClick: () => void;
 }
 
-export default function Navbar({ viewMode, setViewMode, onUploadClick, onNewAlbum, onSearch }: NavbarProps) {
+export default function Navbar({ viewMode, setViewMode, onUploadClick, onNewAlbum, onSearch, onDeleteClick }: NavbarProps) {
   const { theme, toggleTheme } = useTheme();
   const { user } = useAuth();
   const [searchVal, setSearchVal] = useState('');
   const [menuOpen, setMenuOpen] = useState(false);
 
-  function handleSearch(val: string) {
-    setSearchVal(val);
-    onSearch(val);
-  }
-
   return (
     <nav className="navbar">
       <div className="navbar-brand">
-        <span className="navbar-logo">🎞️</span>
+        <Film size={20} strokeWidth={1.5} />
         <span className="navbar-title">Heartstrings</span>
       </div>
 
       <div className="navbar-search">
-        <span className="search-icon">🔍</span>
+        <Search size={14} className="search-icon" />
         <input
           type="text"
           placeholder="Search memories…"
           value={searchVal}
-          onChange={(e) => handleSearch(e.target.value)}
+          onChange={(e) => { setSearchVal(e.target.value); onSearch(e.target.value); }}
         />
       </div>
 
       <div className="navbar-views">
         {([
-          { mode: 'grid', icon: '⊞', label: 'Grid' },
-          { mode: 'timeline', icon: '≡', label: 'Timeline' },
-          { mode: 'albums', icon: '🗂', label: 'Albums' },
-        ] as { mode: ViewMode; icon: string; label: string }[]).map(({ mode, icon, label }) => (
-          <button
-            key={mode}
-            className={`view-btn ${viewMode === mode ? 'active' : ''}`}
-            onClick={() => setViewMode(mode)}
-            title={label}
-          >
-            {icon}
+          { mode: 'grid' as ViewMode, Icon: LayoutGrid, label: 'Grid' },
+          { mode: 'timeline' as ViewMode, Icon: AlignJustify, label: 'Timeline' },
+          { mode: 'albums' as ViewMode, Icon: FolderOpen, label: 'Albums' },
+        ]).map(({ mode, Icon, label }) => (
+          <button key={mode} className={`view-btn ${viewMode === mode ? 'active' : ''}`}
+            onClick={() => setViewMode(mode)} title={label}>
+            <Icon size={18} strokeWidth={1.5} />
           </button>
         ))}
       </div>
@@ -60,23 +56,32 @@ export default function Navbar({ viewMode, setViewMode, onUploadClick, onNewAlbu
       <div className="navbar-actions">
         {viewMode === 'albums' && (
           <button className="btn-new-album" onClick={onNewAlbum} title="New Album">
-            + Album
+            <FolderPlus size={15} strokeWidth={1.5} />
+            <span>New Album</span>
           </button>
         )}
+        <button className="btn-delete-nav" onClick={onDeleteClick} title="Delete items">
+  <Trash2 size={15} strokeWidth={1.5} />
+</button>
         <button className="btn-upload" onClick={onUploadClick}>
-          <span>＋</span> Upload
+          <Upload size={15} strokeWidth={1.5} />
+          <span>Upload</span>
         </button>
         <button className="theme-toggle" onClick={toggleTheme} title="Toggle theme">
-          {theme === 'dark' ? '☀️' : '🌙'}
+          {theme === 'dark'
+            ? <Sun size={18} strokeWidth={1.5} />
+            : <Moon size={18} strokeWidth={1.5} />}
         </button>
         <div className="user-menu-wrap">
           <button className="user-avatar" onClick={() => setMenuOpen(!menuOpen)}>
-            {user?.email?.[0]?.toUpperCase() ?? '?'}
+            <User size={16} strokeWidth={1.5} />
           </button>
           {menuOpen && (
             <div className="user-menu">
               <p className="user-email">{user?.email}</p>
-              <button onClick={() => { setMenuOpen(false); signOut(); }}>Sign out</button>
+              <button onClick={() => { setMenuOpen(false); signOut(); }}>
+                <LogOut size={14} strokeWidth={1.5} /> Sign out
+              </button>
             </div>
           )}
         </div>
