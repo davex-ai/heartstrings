@@ -153,7 +153,7 @@ export default function UploadModal({ albums, onClose, onItemUploaded }: UploadM
                     </div>
                   )}
                   {uf.status === 'done' && <CheckCircle size={20} strokeWidth={1.5} className="status-done" />}
-                  {uf.status === 'error' && <AlertCircle size={20} strokeWidth={1.5} className="status-error" title={uf.error} />}
+                  {uf.status === 'error' && <AlertCircle size={20} strokeWidth={1.5} className="status-error">{uf.error}</AlertCircle>}
                   {uf.status === 'pending' && (
                     <button className="remove-btn" onClick={() => removeFile(idx)}><X size={14} strokeWidth={1.5} /></button>
                   )}
