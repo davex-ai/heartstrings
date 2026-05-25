@@ -53,7 +53,7 @@ body {
   transition: background 0.3s, color 0.3s;
 }
 
-img { display: block; max-width: 100%; }
+img { display: block; max-width: 100%; width: 20%;}
 button { cursor: pointer; border: none; background: none; font-family: inherit; }
 input, select, textarea { font-family: inherit; }
 
@@ -180,7 +180,7 @@ input, select, textarea { font-family: inherit; }
 }
 
 .navbar-brand { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
-.navbar-logo { font-size: 22px; }
+.nav-logo { font-size: 22px; }
 .navbar-title {
   font-family: 'Playfair Display', serif;
   font-size: 1.35rem;

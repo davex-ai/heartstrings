@@ -1,12 +1,13 @@
 import { useState } from 'react';
 import {
-  Film, Search, LayoutGrid, AlignJustify, FolderOpen,
+   Search, LayoutGrid, AlignJustify, FolderOpen,
   Upload, Sun, Moon, LogOut, User, FolderPlus, Trash2,
 } from 'lucide-react';
 import { signOut } from '../lib/supabase';
 import { useTheme } from '../context/ThemeContext';
 import { useAuth } from '../context/AuthContext';
 import type { ViewMode } from '../types';
+import img from './../../Gemini_Generated_Image_7fr8t77fr8t77fr8-removebg-preview.png';
 
 interface NavbarProps {
   viewMode: ViewMode;
@@ -26,7 +27,9 @@ export default function Navbar({ viewMode, setViewMode, onUploadClick, onNewAlbu
   return (
     <nav className="navbar">
       <div className="navbar-brand">
-        <Film size={20} strokeWidth={1.5} className="brand-icon" />
+        <a href="/">
+        <img src={img} alt="" className='nav-logo' />
+        </a>
         <span className="navbar-title">Heartstrings</span>
       </div>
 
